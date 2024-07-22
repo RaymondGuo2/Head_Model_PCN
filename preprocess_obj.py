@@ -1,5 +1,5 @@
-import pandas as pd
 import os
+
 
 # Process obj files in target directory to remove the colour point coordinates
 def preprocess_obj(directory_path):
@@ -33,7 +33,7 @@ def write_to_obj(file_path, vertices, faces):
             file.write(f"f {' '.join(face)}\n")
 
 if __name__ == '__main__':
-    preprocess_obj('/homes/rqg23/individualproject/object_autocompletion/data')
+    preprocess_obj('/Users/raymondguo/Desktop/IndividualProject/object_autocompletion/data')
 
         
 
