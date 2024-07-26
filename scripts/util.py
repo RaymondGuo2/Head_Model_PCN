@@ -1,10 +1,11 @@
 # Code adapted from Cascaded Point Completion by Yuan et al. (2019)
-
 import numpy as np
 import fpsample
 import torch
 import math
 import torch.nn as nn
+from object_autocompletion.tf_ops.grouping.tf_grouping import query_ball_point, group_point, knn_point
+
 
 
 # Normalise points in the unit sphere
@@ -74,4 +75,6 @@ def pointnet_sa_module_msg(xyz, points, npoint, radius_list, nsample_list, mlp_l
     for i in range(len(radius_list)):
         radius = radius_list[i]
         nsample = nsample_list[i]
-        idx, pts_cnt =
+        idx, pts_cnt = query_ball_point(radius, nsample, xyz, new_xyz)
+        grouped_xyz = group_point(xyz, idx)
+        grouped_xy
