@@ -33,7 +33,7 @@ def write_to_obj(file_path, vertices, faces):
             file.write(f"f {' '.join(face)}\n")
 
 if __name__ == '__main__':
-    preprocess_obj('/Users/raymondguo/Desktop/IndividualProject/object_autocompletion/data')
+    preprocess_obj('/data')
 
         
 

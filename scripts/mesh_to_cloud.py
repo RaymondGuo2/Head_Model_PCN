@@ -53,6 +53,6 @@ if __name__ == "__main__":
     # visualise_pcd('./data/000031_processed.pcd')
 
     # Test the shape of the numpy input
-    file = './data/000007_processed.npy'
+    file = '../data/000007_processed.npy'
     trial_file = np.load(file)
     print(trial_file.shape)

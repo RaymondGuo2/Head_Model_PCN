@@ -34,12 +34,12 @@ def cloud_to_mesh(file_path):
                                vertex_normals=np.asarray(mesh.vertex_normals))
     trimesh.convex.is_convex(tri_mesh)
 
-    open3d.io.write_triangle_mesh('./data/processed.obj', mesh)
+    open3d.io.write_triangle_mesh('../data/processed.obj', mesh)
     open3d.visualization.draw_geometries([mesh])
 
 
 if __name__ == '__main__':
     # file_path = './data/000031_processed.npy'
     # numpy_to_cloud(file_path)
-    cloud_to_mesh('./data/000007_processedpost.ply')
+    cloud_to_mesh('../data/000007_processedpost.ply')
 
