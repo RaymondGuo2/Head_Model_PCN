@@ -46,11 +46,11 @@ def gen_grid_up(up_ratio):
             num_x = i
             num_y = up_ratio // i
             break
-    grid_x = np.linspace(-0.2, 0.2, num_x)
-    grid_y = np.linspace(-0.2, 0.2, num_y)
+    grid_x = np.linspace(-0.2, 0.2, num_x)  # linearly spaced num_x points between -0.2 and 0.2
+    grid_y = np.linspace(-0.2, 0.2, num_y)  # linearly spaced num_y points between -0.2 and 0.2
 
-    x, y = np.meshgrid(grid_x, grid_y)
-    grid = torch.stack([x, y], dim=-1).reshape(-1, 2)
+    x, y = np.meshgrid(grid_x, grid_y)  # 2D coordinate matrices
+    grid = torch.stack([x, y], dim=-1).reshape(-1, 2)  # (num_x * num_y, 2) so [2, 2, 2] -> [4, 2]
     return grid
 
 
@@ -61,24 +61,32 @@ def gen_grid(num_grid_point):
     return grid
 
 
+# Adaptation from Cascaded Point Completion
+def conv2d(inputs, num_output_channels, kernel_size, stride=(1,1), activation_fn=nn.ReLU()):
+    layers = []
+    conv = nn.Conv2d(in_channels=inputs.shape[-1], out_channels=num_output_channels, kernel_size=kernel_size, stride=stride, padding=0, bias=True)
+    layers.append(conv)
+    if activation_fn:
+        layers.append(activation_fn())
+
+    return nn.Sequential(*layers)
+
+
 def contract_expand_operation(inputs, up_ratio):
-    net = inputs
-    net = net.reshape(net.size(0), up_ratio, -1, net.size(-1))
-    net = net.permute(0, 2, 1, 3)
-    net = nn.Sequential(
-        nn.Conv2d(net, 64, [1, up_ratio], 1, padding=0),
-        nn.ReLU()
-    )
-    net = nn.Sequential(
-        nn.Conv2d(net, 128, [1, 1], 1, padding=0),
-        nn.ReLU()
-    )
-    net = net.view(net.size(0), -1, up_ratio, 64)
-    net = nn.Sequential(
-        nn.Conv2d(net, 64, [1, 1], 1, padding=0),
-        nn.ReLU()
-    )
-    net = net.view(net.size(0), -1, 64)
+    batch_size, channels, num_points = inputs.shape  # (B, 64, 2048)
+    net = inputs.view(batch_size, up_ratio, num_points // up_ratio , channels)  # (B, 2, 1024, 64)
+    net = net.permute(0, 2, 1, 3)  # (B, 1024, 2, 64)
+
+    conv1 = conv2d(net, 64, (1, up_ratio), activation_fn=nn.ReLU())
+    net = conv1(net)
+
+    conv2 = conv2d(net, 128, (1, 1), activation_fn=nn.ReLU())
+    net = conv2(net)
+
+    net = net.view(batch_size, -1, up_ratio, 64)
+    conv3 = conv2d(net, 64, (1, 1), activation_fn=nn.ReLU())
+    net = conv3(net)
+    net = net.view(batch_size, 64, 2048)
     return net
 
 

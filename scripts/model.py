@@ -9,7 +9,6 @@ from pytorch3d import masked_gather
 from torch_geometric.nn import fps
 
 
-
 class Encoder(nn.Module):
     def __init__(self, embed_size=1024):
         super().__init__()
@@ -48,7 +47,7 @@ class Decoder(nn.Module):
             nn.Linear(mean_feature_dim, 128),
             nn.ReLU()
         )
-        input_channels = 2 + 3 + latent_dim + 128
+        input_channels = 2 + 3 + latent_dim
         self.feat1_layer = nn.Sequential(
             nn.Conv1d(input_channels, 128, kernel_size=1),
             nn.Conv1d(128, 64, kernel_size=1),
@@ -81,21 +80,29 @@ class Decoder(nn.Module):
         for i in range(int(math.log2(step_ratio))):
             num_fine = 2 ** (i + 1) * 1024
             grid = util.gen_grid_up(2 ** (i+1))
-            grid = grid.unsqueeze(0)
-            grid_feat = grid.tile((level0.shape[0], 1024, 1))
-            point_feat = level0.unsqueeze(2).tile((1, 1, 2, 1))
-            point_feat = point_feat.view(-1, num_fine, 3)
-            global_feat = self.latent_input.unsqueeze(1).tile((1, num_fine, 1))
+            grid = grid.unsqueeze(0)  # (1, num_points, 2)
+            grid_feat = torch.tile(grid, (level0.shape[0], 1024, 1))  # (1, num_points, 2) -> (batch_size, num_points * 1024, 2)
+            point_feat = torch.tile(level0.unsqueeze(2), (1, 1, 2, 1))  # (b, 1024, 3) -> (b, 1024, 1, 3) -> (b, 1024, 2, 3)
+            point_feat = point_feat.view(-1, num_fine, 3)  # (b, 1024, 2, 3) or (b, 2048, 3)
+            global_feat = torch.tile(latent_code.unsqueeze(1), (1, num_fine, 1))  # (B, 1, embed_size) -> (B, num_fine, embed_size)
 
-            mean_feature_use = self.mean_feature_layer()
-            mean_feature_use = mean_feature_use.unsqueeze(1)
-            mean_feature_use = mean_feature_use.tile((1, num_fine, 1))
-            feat = torch.concat((grid_feat, point_feat, global_feat, mean_feature_use), dim=2)
-            feat1 = self.feat1_layer(feat)
-            feat2 = util.contract_expand_operation(feat1, 2)
+            if mean_feature is not None:
+                mean_feature_use = self.mean_feature_layer()
+                mean_feature_use = mean_feature_use.unsqueeze(1)
+                mean_feature_use = torch.tile(mean_feature_use, (1, num_fine, 1))
+                feat = torch.cat((grid_feat, point_feat, global_feat, mean_feature_use), dim=2)
+            else:
+                # b_size = grid_feat.size(0)
+                # mean_feature_use = torch.zeros((b_size, num_fine, 128))
+                feat = torch.cat((grid_feat, point_feat, global_feat), dim=2)  # (B, 2048, 2 + 3 + embed_size) -> (B, 2048, 1029)
+
+            feat = feat.permute(0, 2, 1)  # May need to permute given Conv1D requirements -> (B, 1029, 2048)
+            feat1 = self.feat1_layer(feat)  # (B, 64, 2048)
+            feat2 = util.contract_expand_operation(feat1, 2)  # (B, 64, 2048)
             feat = feat1 + feat2
-            fine = self.fine_layer(feat) + point_feat
-            level0 = fine
+            fine_feat = self.fine_layer(feat)  # (B, 3, 2048)
+            fine = fine_feat.permute(0, 2, 1) + point_feat  # (B, 2048, 3) + (B, 2048, 3)
+            level0 = fine  # (B, 2048, 3)
 
         return coarse, fine
 

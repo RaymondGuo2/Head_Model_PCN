@@ -4,7 +4,7 @@ import argparse
 import torch.cuda
 from scripts.DatasetLoader import DatasetLoader
 from scripts.model import Encoder, Decoder, Generator, Discriminator
-
+from pytorch3d.loss import chamfer
 
 def train(args):
     # Load datasets
@@ -29,14 +29,18 @@ def train(args):
             end_idx = min(start_idx + args.batch_size, train_num)
             partial_input_batch, ground_truth_batch = train_data[start_idx:end_idx]
 
+            # Chamfer Distance from Pytorch3D
             coarse_batch, fine_batch = generator(partial_input_batch, args.step_ratio)
-            dist1_coarse, dist2_coarse = chamfer_distance(coarse_batch, ground_truth_batch)
-            dist1_fine, dist2_fine = chamfer_distance(fine_batch, ground_truth_batch)
+            chamfer_coarse, _ = chamfer_distance(coarse_batch, ground_truth_batch, point_reduction=None)
+            dist1_coarse, dist2_coarse = chamfer_coarse
+            chamfer_fine = chamfer_distance(fine_batch, ground_truth_batch, point_reduction=None)
+            dist1_fine, dist2_fine = chamfer_fine
 
             # Generator Loss Function
             total_loss_fine = (torch.mean(torch.sqrt(dist1_fine)) + torch.mean(torch.sqrt(dist2_fine))) / 2
             total_loss_coarse = (torch.mean(torch.sqrt(dist1_coarse)) + torch.mean(torch.sqrt(dist2_coarse))) / 2
-            total_loss_rec_batch = alpha * total_loss_fine + total_loss_coarse
+            alpha = 0.5
+            total_loss_rec_batch = alpha * total_loss_fine + (1 - alpha) * total_loss_coarse
 
             # Discriminator
             d_fake = discriminator(fine_batch, divide_ratio=2)
