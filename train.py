@@ -5,10 +5,11 @@ import torch.cuda
 from scripts.DatasetLoader import DatasetLoader
 from scripts.model import Encoder, Decoder, Generator, Discriminator
 
+
 def train(args):
     # Load datasets
     train_data = DatasetLoader(args.train_data, 'train', args.batch_size, shuffle=True)
-    val_data = DatasetLoader(args.val_data, 'val', args.batch_size, shuffle=False)
+    # val_data = DatasetLoader(args.val_data, 'val', args.batch_size, shuffle=False)
 
     # Set up the Generator
     encoder = Encoder().to(args.device)
@@ -72,27 +73,3 @@ if __name__ == '__main__':
     parser.add_argument('--rec_weight', default=200.0, type=float)
     args = parser.parse_args()
     train(args)
-
-
-
-
-
-
-# def train(args):
-#     inputs_pl = tf.placeholder(tf.float32, (args.batch_size, args.input_num_points, 3), 'inputs')
-#     gt_pl = tf.placeholder(tf.float32, (args.batch_size, args.gt_num_points, 3), 'ground_truths')
-#
-#     # Load the dataset (need to ensure that I can just obtain any batch so need to test)
-#     dataset = DatasetLoader(args.train_data, mode=args.mode, batch_size=args.batch_size)
-#
-#     # Assuming there is no such learning rate decay yet
-#     learning_rate_g = tf.constant(args.generator_learning_rate, name='lr_g')
-#     learning_rate_d = tf.constant(args.discriminator_learning_rate, name='lr_d')
-#
-#     # Initialise the optimisers
-#     with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-#         G_optimisers = tf.train.AdamOptimizer(learning_rate_g, beta1=0.9)
-#         D_optimisers = tf.train.AdamOptimizer(learning_rate_d, beta1=0.5)
-#
-#     with tf.variable_scope('generator', reuse=tf.AUTO_REUSE):
-#         features_partial_batch = model.

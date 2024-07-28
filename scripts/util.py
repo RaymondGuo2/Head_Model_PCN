@@ -4,8 +4,9 @@ import fpsample
 import torch
 import math
 import torch.nn as nn
+from torch_geometric.nn import fps
 from object_autocompletion.tf_ops.grouping.tf_grouping import query_ball_point, group_point, knn_point
-
+from pytorch3d import masked_gather
 
 
 # Normalise points in the unit sphere
@@ -18,11 +19,24 @@ def unit_sphere_normalisation(post_processed_points):
 
 
 def symmetric_sample(points, num):
-    p1_idx = fpsample.fps_sampling(points, num)
-    input_fps = points.gather(1, p1_idx.unsqueeze(-1).expand(-1, -1, points.size(-1)))
-    input_fps_flip = torch.cat([input_fps[:, :, [0]], input_fps[:, :, [1]], -input_fps[:, :, [2]]], dim=2)
+    # Permute since tensor size previously was (B x 2048 x 3) but need (B x 3 x 2048)
+    # Be wary that maybe you don't want to permute the tensor yet in case the function takes the input differently
+    # points = points.permute(0, 2, 1)
+
+    batch_size, num_points, channels = points.shape  # (B x 2048 x 3)
+    points_fps = points.view(batch_size * num_points, channels)  # (B x 2048) x 3
+    batch = torch.arange(batch_size).view(-1, 1).repeat(1, num_points).view(-1)  # Reshape to 1D tensor for all batches and num_points so (B x num_points)
+    p1_idx = fps(points_fps, batch, ratio=num/num_points)  # Output is (B x num)
+    input_fps = masked_gather(points, p1_idx)  # Output is (B x num x 3)
+    # This function flips the z dimension of the model to achieve symmetry, essentially mirroring sides (tensor shape therefore remains the same)
+    input_fps_flip = torch.cat(
+        [input_fps[:, :, [0]],
+         input_fps[:, :, [1]],
+         -input_fps[:, :, [2]]], dim=2
+    )  # Select the x, y, and z points of the fps sampled points and concatenate
+    # Concatenate along the point dimension
     input_fps = torch.cat([input_fps, input_fps_flip], dim=1)
-    return input_fps
+    return input_fps  # (B x (2 * num) x 3)
 
 
 def gen_grid_up(up_ratio):
