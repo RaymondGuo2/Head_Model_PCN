@@ -6,6 +6,7 @@ from scripts.DatasetLoader import DatasetLoader
 from scripts.model import Encoder, Decoder, Generator, Discriminator
 from pytorch3d.loss import chamfer
 
+
 def train(args):
     # Load datasets
     train_data = DatasetLoader(args.train_data, 'train', args.batch_size, shuffle=True)

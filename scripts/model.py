@@ -126,12 +126,12 @@ class Discriminator(nn.Module):
     def forward(self, pcd, divide_ratio=1):
         l0_xyz = pcd
         l0_points = None
-        num_point = pcd.shape[1].value
+        num_point = pcd.get_shape()[1].value
         l1_xyz, l1_points = util.pointnet_sa_module_msg(l0_xyz, l0_points, int(num_point/8), [0.1, 0.2, 0.4], [16, 32, 128],
                                                         [[32//divide_ratio, 32//divide_ratio, 64//divide_ratio],
                                                          [64//divide_ratio, 64//divide_ratio, 128//divide_ratio],
                                                          [64//divide_ratio, 96//divide_ratio, 128//divide_ratio]],
-                                                        scope='layer1', use_nchw=False)
+                                                        use_nchw=False)
         patch_values = nn.Conv1d(l1_points,1, kernel_size=1)
         return patch_values
 

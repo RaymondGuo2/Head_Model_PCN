@@ -62,7 +62,7 @@ def gen_grid(num_grid_point):
 
 
 # Adaptation from Cascaded Point Completion
-def conv2d(inputs, num_output_channels, kernel_size, stride=(1,1), activation_fn=nn.ReLU()):
+def conv2d(inputs, num_output_channels, kernel_size, stride=(1,1), activation_fn=nn.LeakyReLU()):
     layers = []
     conv = nn.Conv2d(in_channels=inputs.shape[-1], out_channels=num_output_channels, kernel_size=kernel_size, stride=stride, padding=0, bias=True)
     layers.append(conv)
@@ -90,13 +90,33 @@ def contract_expand_operation(inputs, up_ratio):
     return net
 
 
-def pointnet_sa_module_msg(xyz, points, npoint, radius_list, nsample_list, mlp_list, scope, use_xyz=True, use_nchw=True):
-    p1_idx = fpsample.fps_sampling(xyz, npoint)
-    new_xyz = xyz.gather(1, p1_idx.unsqueeze(-1).expand(-1, -1, points.size(-1)))
+def pointnet_sa_module_msg(xyz, points, npoint, radius_list, nsample_list, mlp_list, use_xyz=True, use_nchw=True):
+    batch_size, num_points, channels = xyz.shape  # (B x 2048 x 3)
+    xyz_fps = xyz.view(batch_size * num_points, channels)  # (B x 2048) x 3
+    batch = torch.arange(batch_size).view(-1, 1).repeat(1, num_points).view(-1)  # Reshape to 1D tensor for all batches and num_points so (B x num_points)
+    p1_idx = fps(xyz_fps, batch, ratio=npoint/num_points)  # Output is (B x num)
+    new_xyz = masked_gather(xyz, p1_idx)
     new_points_list = []
+
     for i in range(len(radius_list)):
         radius = radius_list[i]
         nsample = nsample_list[i]
         idx, pts_cnt = query_ball_point(radius, nsample, xyz, new_xyz)
         grouped_xyz = group_point(xyz, idx)
-        grouped_xy
+        grouped_xyz -= torch.tile(new_xyz.unsqueeze(2), (1, 1, nsample, 1))
+        if points is not None:
+            grouped_points = group_point(points, idx)
+            if use_xyz:
+                grouped_points = torch.cat([grouped_points, grouped_xyz], dim=-1)
+        else:
+            grouped_points = grouped_xyz
+        if use_nchw:
+            grouped_points = grouped_points.permute(0, 3, 1, 2)
+        for j, num_out_channel in enumerate(mlp_list[i]):
+            grouped_points = conv2d(grouped_points, num_out_channel, kernel_size=(1, 1), stride=(1, 1), activation_fn=nn.LeakyReLU())
+        if use_nchw:
+            grouped_points = grouped_points.permute(0, 2, 3, 1)
+        new_points, _ = torch.max(grouped_points, dim=2)
+        new_points_list.append(new_points)
+    new_points_concat = torch.cat(new_points_list, dim=-1)
+    return new_xyz, new_points_concat
