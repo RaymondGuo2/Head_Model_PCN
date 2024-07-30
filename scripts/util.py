@@ -1,12 +1,11 @@
 # Code adapted from Cascaded Point Completion by Yuan et al. (2019)
 import numpy as np
-import fpsample
 import torch
 import math
 import torch.nn as nn
 from torch_geometric.nn import fps
-# from object_autocompletion.tf_ops.grouping.tf_grouping import query_ball_point, group_point, knn_point
-# from pytorch3d import masked_gather
+from object_autocompletion.tf_ops.grouping.tf_grouping import query_ball_point, group_point, knn_point
+from pytorch3d import masked_gather
 
 
 # Normalise points in the unit sphere
