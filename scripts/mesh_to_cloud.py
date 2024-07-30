@@ -7,7 +7,7 @@ from util import unit_sphere_normalisation
 # Function to convert obj mesh files to point cloud
 def mesh_to_cloud(directory_path, preprocess=True, training_resolution=2048):
     for file in os.listdir(directory_path):
-        if file.endswith("_processed.obj"):
+        if file.endswith(".obj"):
             path = os.path.join(directory_path, file)
             mesh = open3d.io.read_triangle_mesh(path)
             mesh.compute_vertex_normals()
