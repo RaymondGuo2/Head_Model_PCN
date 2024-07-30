@@ -3,6 +3,10 @@ import os
 
 # Process obj files in target directory to remove the colour point coordinates
 def preprocess_obj(directory_path, target_directory):
+
+    directory_path = os.path.expanduser(directory_path)
+    target_directory = os.path.expanduser(target_directory)
+
     os.makedirs(target_directory, exist_ok=True)
     for file in os.listdir(directory_path):
         vertices = []
