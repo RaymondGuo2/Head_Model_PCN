@@ -18,12 +18,12 @@ def preprocess_obj(directory_path, target_directory):
         if file.endswith('.obj') and not os.path.isfile(processed_path):
             with open(path, 'r') as f:
                 for line in f:
-                    if line.startswith('v'):
+                    if line.startswith('v '):
                         elements = line.split()
                         vertices.append(elements[1:4])
                     if line.startswith('f'):
                         elements = line.split()
-                        faces.append(elements[1:])
+                        faces.append([int(index.split('/')[0]) for index in elements[1:]])
             
             # Write to obj file
             write_to_obj(processed_path, vertices, faces)
@@ -35,14 +35,16 @@ def write_to_obj(file_path, vertices, faces):
         for vertex in vertices:
             file.write(f"v {vertex[0]} {vertex[1]} {vertex[2]}\n")
         for face in faces:
-            file.write(f"f {' '.join(face)}\n")
+            face_indices = ' '.join(map(str, face))
+            file.write(f"f {face_indices}\n")
 
 
 if __name__ == '__main__':
-    source_dir = '~/../../vol/bitbucket/rqg23/landmark_outputs'
-    target_dir = '~/../../vol/bitbucket/rqg23/preprocessed_obj_partial_inputs'
+    source_dir = '~/../../vol/bitbucket/rqg23/ground_truth_faceCompletion'
+    target_dir = '~/../../vol/bitbucket/rqg23/ground_truth_obj_processed'
+    # source_dir = '/Users/raymondguo/Desktop/IndividualProject/object_autocompletion/data'
+    # target_dir = '/Users/raymondguo/Desktop/IndividualProject/object_autocompletion'
     preprocess_obj(source_dir, target_dir)
-
         
 
     
