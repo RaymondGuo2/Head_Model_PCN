@@ -35,10 +35,12 @@ def mesh_to_cloud(directory_path, preprocess=True, training_resolution=2048):
             cloud_filename = os.path.splitext(file)[0] + '.pcd'
             cloud_file = os.path.join(directory_path, cloud_filename)
             open3d.io.write_point_cloud(cloud_file, point_cloud, write_ascii=True)
+            print(f"Saved point cloud {cloud_filename}")
 
             numpy_filename = os.path.splitext(file)[0] + '.npy'
             numpy_file = os.path.join(directory_path, numpy_filename)
             np.save(numpy_file, npy_array)
+            print(f"Saved numpy file {numpy_filename}")
 
 
 def visualise_pcd(pcd_file_path, training_resolution=16384):
