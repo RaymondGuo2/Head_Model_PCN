@@ -6,6 +6,7 @@ from util import unit_sphere_normalisation
 
 # Function to convert obj mesh files to point cloud
 def mesh_to_cloud(directory_path, preprocess=True, training_resolution=2048):
+    directory_path = os.path.expanduser(directory_path)
     for file in os.listdir(directory_path):
         if file.endswith(".obj"):
             path = os.path.join(directory_path, file)
@@ -47,12 +48,12 @@ def visualise_pcd(pcd_file_path, training_resolution=16384):
 
 if __name__ == "__main__":
     # Convert the preprocessed mesh files into point clouds
-    # mesh_to_cloud('./data')
+    mesh_to_cloud('~/../../vol/bitbucket/rqg23/preprocessed_obj_partial_inputs')
 
     # Visualise the point clouds
     # visualise_pcd('./data/000031_processed.pcd')
 
     # Test the shape of the numpy input
-    file = '../data/000007_processed.npy'
-    trial_file = np.load(file)
-    print(trial_file.shape)
+    # file = '../data/000007_processed.npy'
+    # trial_file = np.load(file)
+    # print(trial_file.shape)
