@@ -23,6 +23,7 @@ def preprocess_obj(directory_path, target_directory):
             
             # Write to obj file
             write_to_obj(processed_path, vertices, faces)
+            print(f'Processed {file}')
 
             
 def write_to_obj(file_path, vertices, faces):
