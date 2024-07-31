@@ -2,10 +2,8 @@
 
 import torch
 import torch.nn as nn
-import util
-import fpsample
+from .util import symmetric_sample, gen_grid_up, contract_expand_operation, pointnet_sa_module_msg, masked_gather
 import math
-from pytorch3d import masked_gather
 from torch_geometric.nn import fps
 
 
@@ -66,7 +64,7 @@ class Decoder(nn.Module):
         # Coarse reconstruction completed
         coarse = level0  # (B x 512 x 3)
         # partial_inputs is still (B x 2048 x 3)
-        input_fps = util.symmetric_sample(partial_inputs, int(num_extract/2))  # (B x num_extract x 3)
+        input_fps = symmetric_sample(partial_inputs, int(num_extract/2))  # (B x num_extract x 3)
         level0 = torch.cat([input_fps, level0], dim=1)  # (B x (num_extract + 512) x 3) or in this case (B x 1024 x 3)
 
         # Point subsampling
@@ -79,7 +77,7 @@ class Decoder(nn.Module):
 
         for i in range(int(math.log2(step_ratio))):
             num_fine = 2 ** (i + 1) * 1024
-            grid = util.gen_grid_up(2 ** (i+1))
+            grid = gen_grid_up(2 ** (i+1))
             grid = grid.unsqueeze(0)  # (1, num_points, 2)
             grid_feat = torch.tile(grid, (level0.shape[0], 1024, 1))  # (1, num_points, 2) -> (batch_size, num_points * 1024, 2)
             point_feat = torch.tile(level0.unsqueeze(2), (1, 1, 2, 1))  # (b, 1024, 3) -> (b, 1024, 1, 3) -> (b, 1024, 2, 3)
@@ -98,7 +96,7 @@ class Decoder(nn.Module):
 
             feat = feat.permute(0, 2, 1)  # May need to permute given Conv1D requirements -> (B, 1029, 2048)
             feat1 = self.feat1_layer(feat)  # (B, 64, 2048)
-            feat2 = util.contract_expand_operation(feat1, 2)  # (B, 64, 2048)
+            feat2 = contract_expand_operation(feat1, 2)  # (B, 64, 2048)
             feat = feat1 + feat2
             fine_feat = self.fine_layer(feat)  # (B, 3, 2048)
             fine = fine_feat.permute(0, 2, 1) + point_feat  # (B, 2048, 3) + (B, 2048, 3)
@@ -119,21 +117,26 @@ class Generator(nn.Module):
         return coarse, fine
 
 
-class Discriminator(nn.Module):
-    def __init__(self):
-        super().__init__()
+# class Discriminator(nn.Module):
+#     def __init__(self):
+#         super().__init__()
 
-    def forward(self, pcd, divide_ratio=1):
-        l0_xyz = pcd
-        l0_points = None
-        num_point = pcd.get_shape()[1].value
-        l1_xyz, l1_points = util.pointnet_sa_module_msg(l0_xyz, l0_points, int(num_point/8), [0.1, 0.2, 0.4], [16, 32, 128],
-                                                        [[32//divide_ratio, 32//divide_ratio, 64//divide_ratio],
-                                                         [64//divide_ratio, 64//divide_ratio, 128//divide_ratio],
-                                                         [64//divide_ratio, 96//divide_ratio, 128//divide_ratio]],
-                                                        use_nchw=False)
-        patch_values = nn.Conv1d(l1_points,1, kernel_size=1)
-        return patch_values
+#     def forward(self, pcd, divide_ratio=1):
+#         l0_xyz = pcd
+#         l0_points = None
+#         num_point = pcd.size(1)
+#         l1_xyz, l1_points = pointnet_sa_module_msg(l0_xyz, l0_points, int(num_point/8), [0.1, 0.2, 0.4], [16, 32, 128],
+#                                                         [[32//divide_ratio, 32//divide_ratio, 64//divide_ratio],
+#                                                          [64//divide_ratio, 64//divide_ratio, 128//divide_ratio],
+#                                                          [64//divide_ratio, 96//divide_ratio, 128//divide_ratio]],
+#                                                         use_nchw=False)
+#         patch_values = nn.Conv1d(l1_points,1, kernel_size=1)
+#         return patch_values
+
+# def discriminator_fn(pcd, points, divide_ratio=1)
+#     batch_size, num_points, channels = pcd.size()
+#     npoint = num_points // 2048
+
 
 
 

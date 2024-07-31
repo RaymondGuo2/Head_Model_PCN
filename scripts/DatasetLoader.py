@@ -6,7 +6,7 @@ import torch
 
 
 class DatasetLoader(Dataset):
-    def __init__(self, directory_path, mode='train', batch_size=32, shuffle=True):
+    def __init__(self, directory_path, mode='train'):
         self.directory_path = directory_path
         self.partial_inputs = []
         self.ground_truths = []

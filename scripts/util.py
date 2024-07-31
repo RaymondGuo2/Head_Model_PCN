@@ -1,12 +1,11 @@
 # Code adapted from Cascaded Point Completion by Yuan et al. (2019)
 import numpy as np
+import sys
+import os
 import torch
 import math
 import torch.nn as nn
 from torch_geometric.nn import fps
-from object_autocompletion.tf_ops.grouping.tf_grouping import query_ball_point, group_point, knn_point
-from pytorch3d import masked_gather
-
 
 # Normalise points in the unit sphere
 def unit_sphere_normalisation(post_processed_points):
@@ -119,3 +118,121 @@ def pointnet_sa_module_msg(xyz, points, npoint, radius_list, nsample_list, mlp_l
         new_points_list.append(new_points)
     new_points_concat = torch.cat(new_points_list, dim=-1)
     return new_xyz, new_points_concat
+
+
+# GPT Function (Investigate pytorch3d function) - will attempt to optimise with C++
+def query_ball_point(radius, nsample, xyz, new_xyz):
+    """
+    Args:
+        radius: float, radius of the ball query
+        nsample: int, maximum number of points to gather in the ball
+        xyz: (batch_size, ndataset, 3) float32 array, input points
+        new_xyz: (batch_size, npoint, 3) float32 array, query points
+
+    Returns:
+        idx: (batch_size, npoint, nsample) int32 array, indices to input points
+        pts_cnt: (batch_size, npoint) int32 array, number of unique points in each local region
+    """
+    B, N, _ = xyz.shape
+    _, S, _ = new_xyz.shape
+
+    # Compute squared distance between each point in xyz and new_xyz
+    dists = torch.cdist(new_xyz, xyz, p=2)  # (B, S, N)
+
+    # Find points within the specified radius
+    mask = dists <= radius  # (B, S, N)
+
+    # Initialize output arrays
+    idx = torch.zeros((B, S, nsample), dtype=torch.int32, device=xyz.device)
+    pts_cnt = torch.zeros((B, S), dtype=torch.int32, device=xyz.device)
+
+    for b in range(B):
+        for s in range(S):
+            valid_indices = torch.nonzero(mask[b, s])[:, 0]
+            if valid_indices.numel() == 0:
+                continue
+
+            if valid_indices.numel() > nsample:
+                # Randomly sample nsample points
+                selected_indices = valid_indices[torch.randperm(valid_indices.numel())[:nsample]]
+            else:
+                # Pad the remaining with the last valid index
+                selected_indices = torch.cat([
+                    valid_indices,
+                    valid_indices[-1].repeat(nsample - valid_indices.numel())
+                ])
+
+            idx[b, s, :selected_indices.numel()] = selected_indices
+            pts_cnt[b, s] = valid_indices.numel()
+
+    return idx, pts_cnt
+
+# GPT Function
+def group_point(points, idx):
+    """
+    Args:
+        points: (batch_size, ndataset, channel) float32 array, points to sample from
+        idx: (batch_size, npoint, nsample) int32 array, indices to points
+
+    Returns:
+        out: (batch_size, npoint, nsample, channel) float32 array, values sampled from points
+    """
+    B, N, C = points.shape
+    _, S, K = idx.shape
+
+    # Expand idx to have the same number of dimensions as points
+    idx_expanded = idx.unsqueeze(-1).expand(-1, -1, -1, C)  # (B, S, K, C)
+
+    # Gather points along the 1st dimension (ndataset)
+    grouped_points = torch.gather(points.unsqueeze(1).expand(-1, S, -1, -1), 2, idx_expanded)  # (B, S, K, C)
+
+    return grouped_points
+
+# https://pytorch3d.readthedocs.io/en/latest/_modules/pytorch3d/ops/utils.html
+
+def masked_gather(points: torch.Tensor, idx: torch.Tensor) -> torch.Tensor:
+    """
+    Helper function for torch.gather to collect the points at
+    the given indices in idx where some of the indices might be -1 to
+    indicate padding. These indices are first replaced with 0.
+    Then the points are gathered after which the padded values
+    are set to 0.0.
+
+    Args:
+        points: (N, P, D) float32 tensor of points
+        idx: (N, K) or (N, P, K) long tensor of indices into points, where
+            some indices are -1 to indicate padding
+
+    Returns:
+        selected_points: (N, K, D) float32 tensor of points
+            at the given indices
+    """
+
+    if len(idx) != len(points):
+        raise ValueError("points and idx must have the same batch dimension")
+
+    N, P, D = points.shape
+
+    if idx.ndim == 3:
+        # Case: KNN, Ball Query where idx is of shape (N, P', K)
+        # where P' is not necessarily the same as P as the
+        # points may be gathered from a different pointcloud.
+        K = idx.shape[2]
+        # Match dimensions for points and indices
+        idx_expanded = idx[..., None].expand(-1, -1, -1, D)
+        points = points[:, :, None, :].expand(-1, -1, K, -1)
+    elif idx.ndim == 2:
+        # Farthest point sampling where idx is of shape (N, K)
+        idx_expanded = idx[..., None].expand(-1, -1, D)
+    else:
+        raise ValueError("idx format is not supported %s" % repr(idx.shape))
+
+    idx_expanded_mask = idx_expanded.eq(-1)
+    idx_expanded = idx_expanded.clone()
+    # Replace -1 values with 0 for gather
+    idx_expanded[idx_expanded_mask] = 0
+    # Gather points
+    selected_points = points.gather(dim=1, index=idx_expanded)
+    # Replace padded values
+    selected_points[idx_expanded_mask] = 0.0
+    return selected_points

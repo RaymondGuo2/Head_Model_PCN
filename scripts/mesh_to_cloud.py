@@ -50,7 +50,7 @@ def visualise_pcd(pcd_file_path, training_resolution=16384):
 
 if __name__ == "__main__":
     # Convert the preprocessed mesh files into point clouds
-    mesh_to_cloud('~/../../vol/bitbucket/rqg23/preprocessed_obj_partial_inputs')
+    mesh_to_cloud('~/../../vol/bitbucket/rqg23/ground_truth_obj_processed')
 
     # Visualise the point clouds
     # visualise_pcd('./data/000031_processed.pcd')
