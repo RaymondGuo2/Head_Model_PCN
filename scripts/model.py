@@ -68,7 +68,7 @@ class Decoder(nn.Module):
         level0 = torch.cat([input_fps, level0], dim=1)  # (B x (num_extract + 512) x 3) or in this case (B x 1024 x 3)
 
         # Point subsampling
-        if self.num_extract > 512:
+        if num_extract > 512:
             b, n, c = level0.shape
             level0_fps = level0.view(b * n, c)
             b_reshape = torch.arange(b).view(-1, 1).repeat(1, n).view(-1)

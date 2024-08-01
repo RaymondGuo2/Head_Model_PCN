@@ -5,6 +5,7 @@ import os
 import torch
 import math
 import torch.nn as nn
+import torch_cluster
 from torch_geometric.nn import fps
 
 # Normalise points in the unit sphere
@@ -22,9 +23,10 @@ def symmetric_sample(points, num):
     # points = points.permute(0, 2, 1)
 
     batch_size, num_points, channels = points.shape  # (B x 2048 x 3)
-    points_fps = points.view(batch_size * num_points, channels)  # (B x 2048) x 3
-    batch = torch.arange(batch_size).view(-1, 1).repeat(1, num_points).view(-1)  # Reshape to 1D tensor for all batches and num_points so (B x num_points)
+    points_fps = points.view(-1, channels)  # (B x 2048) x 3
+    batch = torch.arange(batch_size).repeat_interleave(num_points)  # Reshape to 1D tensor for all batches and num_points so (B x num_points)
     p1_idx = fps(points_fps, batch, ratio=num/num_points)  # Output is (B x num)
+    p1_idx = p1_idx.view(batch_size, -1) % num_points
     input_fps = masked_gather(points, p1_idx)  # Output is (B x num x 3)
     # This function flips the z dimension of the model to achieve symmetry, essentially mirroring sides (tensor shape therefore remains the same)
     input_fps_flip = torch.cat(
@@ -44,10 +46,10 @@ def gen_grid_up(up_ratio):
             num_x = i
             num_y = up_ratio // i
             break
-    grid_x = np.linspace(-0.2, 0.2, num_x)  # linearly spaced num_x points between -0.2 and 0.2
-    grid_y = np.linspace(-0.2, 0.2, num_y)  # linearly spaced num_y points between -0.2 and 0.2
+    grid_x = torch.tensor(torch.linspace(-0.2, 0.2, num_x))  # linearly spaced num_x points between -0.2 and 0.2
+    grid_y = torch.tensor(torch.linspace(-0.2, 0.2, num_y))  # linearly spaced num_y points between -0.2 and 0.2
 
-    x, y = np.meshgrid(grid_x, grid_y)  # 2D coordinate matrices
+    x, y = torch.meshgrid(grid_x, grid_y)  # 2D coordinate matrices
     grid = torch.stack([x, y], dim=-1).reshape(-1, 2)  # (num_x * num_y, 2) so [2, 2, 2] -> [4, 2]
     return grid
 
@@ -60,28 +62,30 @@ def gen_grid(num_grid_point):
 
 
 # Adaptation from Cascaded Point Completion
-def conv2d(inputs, num_output_channels, kernel_size, stride=(1,1), activation_fn=nn.LeakyReLU()):
+def conv2d(inputs, num_output_channels, kernel_size, stride=(1,1), activation_fn=None):
     layers = []
-    conv = nn.Conv2d(in_channels=inputs.shape[-1], out_channels=num_output_channels, kernel_size=kernel_size, stride=stride, padding=0, bias=True)
+    conv = nn.Conv2d(in_channels=inputs.shape[1], out_channels=num_output_channels, kernel_size=kernel_size, stride=stride, padding=0, bias=True)
     layers.append(conv)
     if activation_fn:
-        layers.append(activation_fn())
+        layers.append(activation_fn)
 
     return nn.Sequential(*layers)
 
 
 def contract_expand_operation(inputs, up_ratio):
     batch_size, channels, num_points = inputs.shape  # (B, 64, 2048)
-    net = inputs.view(batch_size, up_ratio, num_points // up_ratio , channels)  # (B, 2, 1024, 64)
-    net = net.permute(0, 2, 1, 3)  # (B, 1024, 2, 64)
+    # net = inputs.view(batch_size, up_ratio, num_points // up_ratio , channels)  # (B, 2, 1024, 64)
+    net = inputs.view(batch_size, channels, up_ratio, num_points // up_ratio)
+    # net = net.permute(0, 2, 1, 3)  # (B, 1024, 2, 64)
+    # net = net.permute(0, 1, 3, 2)
 
-    conv1 = conv2d(net, 64, (1, up_ratio), activation_fn=nn.ReLU())
+    conv1 = conv2d(net, 64, (1, 1), activation_fn=nn.ReLU())
     net = conv1(net)
 
     conv2 = conv2d(net, 128, (1, 1), activation_fn=nn.ReLU())
     net = conv2(net)
 
-    net = net.view(batch_size, -1, up_ratio, 64)
+    # net = net.view(batch_size, -1, up_ratio, 64)
     conv3 = conv2d(net, 64, (1, 1), activation_fn=nn.ReLU())
     net = conv3(net)
     net = net.view(batch_size, 64, 2048)

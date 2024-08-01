@@ -9,8 +9,7 @@ from scripts.DatasetLoader import DatasetLoader
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # from scripts.model import Encoder, Decoder, Generator, Discriminator
 from scripts.model import Encoder, Decoder, Generator
-from pytorch3d.loss import chamfer
-
+from pytorch3d.loss import chamfer_distance
 
 
 def train(args):
@@ -30,24 +29,22 @@ def train(args):
     optimiser_g = torch.optim.Adam(list(generator.parameters()), lr=args.generator_learning_rate)
     # optimiser_d = torch.optim.Adam(list(discriminator.parameters()), lr=args.discriminator_learning_rate)
 
-    train_num = len(data_train)
-    num_batches = train_num // args.batch_size
     for epoch in range(args.epochs):
         print(f"Training epoch {epoch + 1} / {args.epochs}")
-        for batch_idx in range(num_batches):
-            start_idx = batch_idx * args.batch_size
-            end_idx = min(start_idx + args.batch_size, train_num)
-            partial_input_batch, ground_truth_batch = data_train[start_idx:end_idx]
-            print(partial_input_batch, ground_truth_batch)
+        for batch_idx, (partial_input_batch, ground_truth_batch) in enumerate(data_train):
+            partial_input_batch = partial_input_batch.to(args.device)
+            ground_truth_batch = ground_truth_batch.to(args.device)
             # Chamfer Distance from Pytorch3D
             coarse_batch, fine_batch = generator(partial_input_batch, args.step_ratio)
-            chamfer_coarse, _ = chamfer_distance(coarse_batch, ground_truth_batch, point_reduction=None)
+            chamfer_coarse, _ = chamfer_distance(coarse_batch, ground_truth_batch, batch_reduction=None, point_reduction=None)
             dist1_coarse, dist2_coarse = chamfer_coarse
-            chamfer_fine = chamfer_distance(fine_batch, ground_truth_batch, point_reduction=None)
+            chamfer_fine = chamfer_distance(fine_batch, ground_truth_batch, batch_reduction=None, point_reduction=None)
             dist1_fine, dist2_fine = chamfer_fine
-            print(f"Coarse Chamfer: {dist1_coarse, dist2_coarse}")
-            print(f"Fine Chamfer: {dist1_fine, dist2_fine}")
-
+            lmao, _ = torch.mean(torch.sqrt(dist1_coarse))
+            print(lmao)
+            lol = torch.sqrt(dist1_coarse)
+            print(lol)
+            print(f"torch.mean: {torch.mean(lol)}")
             # Generator Loss Function
             total_loss_fine = (torch.mean(torch.sqrt(dist1_fine)) + torch.mean(torch.sqrt(dist2_fine))) / 2
             total_loss_coarse = (torch.mean(torch.sqrt(dist1_coarse)) + torch.mean(torch.sqrt(dist2_coarse))) / 2
@@ -78,7 +75,7 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--train_data', default='~/../vol/bitbucket/rqg23/faceCompletionData')
+    parser.add_argument('--train_data', default='/Users/raymondguo/Desktop/IndividualProject/faceCompletionData')
     parser.add_argument('--mode', default='train', type=str)
     # parser.add_argument('--val_data', default='./data/val_data')
     parser.add_argument('--epochs', type=int, default=2)
@@ -89,5 +86,6 @@ if __name__ == '__main__':
     parser.add_argument('--gt_num_points', default=2048, type=int)
     parser.add_argument('--device', default='cpu', type=str)
     parser.add_argument('--rec_weight', default=200.0, type=float)
+    parser.add_argument('--step_ratio', type=int, default=2)
     args = parser.parse_args()
     train(args)
