@@ -64,7 +64,7 @@ class Decoder(nn.Module):
         # Coarse reconstruction completed
         coarse = level0  # (B x 512 x 3)
         # partial_inputs is still (B x 2048 x 3)
-        input_fps = symmetric_sample(partial_inputs, int(num_extract/2))  # (B x num_extract x 3)
+        input_fps = symmetric_sample(partial_inputs, int(num_extract / 2))  # (B x num_extract x 3)
         level0 = torch.cat([input_fps, level0], dim=1)  # (B x (num_extract + 512) x 3) or in this case (B x 1024 x 3)
 
         # Point subsampling
@@ -72,17 +72,20 @@ class Decoder(nn.Module):
             b, n, c = level0.shape
             level0_fps = level0.view(b * n, c)
             b_reshape = torch.arange(b).view(-1, 1).repeat(1, n).view(-1)
-            fps_num = fps(level0_fps, b_reshape, ratio=1024/n)
+            fps_num = fps(level0_fps, b_reshape, ratio=1024 / n)
             level0 = masked_gather(level0, fps_num)
 
         for i in range(int(math.log2(step_ratio))):
             num_fine = 2 ** (i + 1) * 1024
-            grid = gen_grid_up(2 ** (i+1))
+            grid = gen_grid_up(2 ** (i + 1))
             grid = grid.unsqueeze(0)  # (1, num_points, 2)
-            grid_feat = torch.tile(grid, (level0.shape[0], 1024, 1))  # (1, num_points, 2) -> (batch_size, num_points * 1024, 2)
-            point_feat = torch.tile(level0.unsqueeze(2), (1, 1, 2, 1))  # (b, 1024, 3) -> (b, 1024, 1, 3) -> (b, 1024, 2, 3)
+            grid_feat = torch.tile(grid, (
+            level0.shape[0], 1024, 1))  # (1, num_points, 2) -> (batch_size, num_points * 1024, 2)
+            point_feat = torch.tile(level0.unsqueeze(2),
+                                    (1, 1, 2, 1))  # (b, 1024, 3) -> (b, 1024, 1, 3) -> (b, 1024, 2, 3)
             point_feat = point_feat.view(-1, num_fine, 3)  # (b, 1024, 2, 3) or (b, 2048, 3)
-            global_feat = torch.tile(latent_code.unsqueeze(1), (1, num_fine, 1))  # (B, 1, embed_size) -> (B, num_fine, embed_size)
+            global_feat = torch.tile(latent_code.unsqueeze(1),
+                                     (1, num_fine, 1))  # (B, 1, embed_size) -> (B, num_fine, embed_size)
 
             if mean_feature is not None:
                 mean_feature_use = self.mean_feature_layer()
@@ -92,7 +95,8 @@ class Decoder(nn.Module):
             else:
                 # b_size = grid_feat.size(0)
                 # mean_feature_use = torch.zeros((b_size, num_fine, 128))
-                feat = torch.cat((grid_feat, point_feat, global_feat), dim=2)  # (B, 2048, 2 + 3 + embed_size) -> (B, 2048, 1029)
+                feat = torch.cat((grid_feat, point_feat, global_feat),
+                                 dim=2)  # (B, 2048, 2 + 3 + embed_size) -> (B, 2048, 1029)
 
             feat = feat.permute(0, 2, 1)  # May need to permute given Conv1D requirements -> (B, 1029, 2048)
             feat1 = self.feat1_layer(feat)  # (B, 64, 2048)
@@ -117,31 +121,24 @@ class Generator(nn.Module):
         return coarse, fine
 
 
-# class Discriminator(nn.Module):
-#     def __init__(self):
-#         super().__init__()
+class Discriminator(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv1d(160, 1, kernel_size=1)
 
-#     def forward(self, pcd, divide_ratio=1):
-#         l0_xyz = pcd
-#         l0_points = None
-#         num_point = pcd.size(1)
-#         l1_xyz, l1_points = pointnet_sa_module_msg(l0_xyz, l0_points, int(num_point/8), [0.1, 0.2, 0.4], [16, 32, 128],
-#                                                         [[32//divide_ratio, 32//divide_ratio, 64//divide_ratio],
-#                                                          [64//divide_ratio, 64//divide_ratio, 128//divide_ratio],
-#                                                          [64//divide_ratio, 96//divide_ratio, 128//divide_ratio]],
-#                                                         use_nchw=False)
-#         patch_values = nn.Conv1d(l1_points,1, kernel_size=1)
-#         return patch_values
+    def forward(self, pcd, divide_ratio=1):
+        l0_xyz = pcd
+        l0_points = None
+        num_point = pcd.size(1)
+        l1_xyz, l1_points = pointnet_sa_module_msg(l0_xyz, l0_points, int(num_point / 8), [0.1, 0.2, 0.4],
+                                                   [16, 32, 128],
+                                                   [[32 // divide_ratio, 32 // divide_ratio, 64 // divide_ratio],
+                                                    [64 // divide_ratio, 64 // divide_ratio, 128 // divide_ratio],
+                                                    [64 // divide_ratio, 96 // divide_ratio, 128 // divide_ratio]],
+                                                   use_nchw=False)
+        l1_points = l1_points.permute(0, 2, 1)
+        patch_values = self.conv1(l1_points)
+        patch_values = patch_values.permute(0, 2, 1)
+        return patch_values  # (B, 256, 1)
 
-# def discriminator_fn(pcd, points, divide_ratio=1)
-#     batch_size, num_points, channels = pcd.size()
-#     npoint = num_points // 2048
-
-
-
-
-
-
-
-
-
+## GAN Loss plot and print when saving the model

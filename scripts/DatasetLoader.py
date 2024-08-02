@@ -31,9 +31,6 @@ class DatasetLoader(Dataset):
         partial_input = self.partial_inputs[index]
         ground_truth = self.ground_truths[index]
 
-        print(f"The partial input is {partial_input}")
-        print(f"The ground truth is {ground_truth}")
-
         # Load the numpy file
         partial_input = np.load(partial_input)
         ground_truth = np.load(ground_truth)

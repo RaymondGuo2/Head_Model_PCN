@@ -7,13 +7,15 @@ import os
 from torch.utils.data import DataLoader
 from scripts.DatasetLoader import DatasetLoader
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# from scripts.model import Encoder, Decoder, Generator, Discriminator
-from scripts.model import Encoder, Decoder, Generator
+from scripts.model import Encoder, Decoder, Generator, Discriminator
 from pytorch3d.loss import chamfer_distance
+import torch.autograd as autograd
+
 
 
 def train(args):
     # Load datasets
+    autograd.set_detect_anomaly(True)
     train_data = DatasetLoader(args.train_data, 'train')
     data_train = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     # val_data = DatasetLoader(args.val_data, 'val', args.batch_size, shuffle=False)
@@ -23,11 +25,11 @@ def train(args):
     encoder = Encoder().to(args.device)
     decoder = Decoder().to(args.device)
     generator = Generator(encoder, decoder).to(args.device)
-    # discriminator = Discriminator().to(args.device)
+    discriminator = Discriminator().to(args.device)
 
     # Optimisers
     optimiser_g = torch.optim.Adam(list(generator.parameters()), lr=args.generator_learning_rate)
-    # optimiser_d = torch.optim.Adam(list(discriminator.parameters()), lr=args.discriminator_learning_rate)
+    optimiser_d = torch.optim.Adam(list(discriminator.parameters()), lr=args.discriminator_learning_rate)
 
     for epoch in range(args.epochs):
         print(f"Training epoch {epoch + 1} / {args.epochs}")
@@ -38,13 +40,8 @@ def train(args):
             coarse_batch, fine_batch = generator(partial_input_batch, args.step_ratio)
             chamfer_coarse, _ = chamfer_distance(coarse_batch, ground_truth_batch, batch_reduction=None, point_reduction=None)
             dist1_coarse, dist2_coarse = chamfer_coarse
-            chamfer_fine = chamfer_distance(fine_batch, ground_truth_batch, batch_reduction=None, point_reduction=None)
+            chamfer_fine, _ = chamfer_distance(fine_batch, ground_truth_batch, batch_reduction=None, point_reduction=None)
             dist1_fine, dist2_fine = chamfer_fine
-            lmao, _ = torch.mean(torch.sqrt(dist1_coarse))
-            print(lmao)
-            lol = torch.sqrt(dist1_coarse)
-            print(lol)
-            print(f"torch.mean: {torch.mean(lol)}")
             # Generator Loss Function
             total_loss_fine = (torch.mean(torch.sqrt(dist1_fine)) + torch.mean(torch.sqrt(dist2_fine))) / 2
             total_loss_coarse = (torch.mean(torch.sqrt(dist1_coarse)) + torch.mean(torch.sqrt(dist2_coarse))) / 2
@@ -52,25 +49,26 @@ def train(args):
             total_loss_rec_batch = alpha * total_loss_fine + (1 - alpha) * total_loss_coarse
             print(f"Total batch reconstruction loss: {total_loss_rec_batch}")
 
-            # # Discriminator
-            # d_fake = discriminator(fine_batch, divide_ratio=2)
-            # d_real = discriminator(ground_truth_batch, divide_ratio=2)
-            # d_loss_real = torch.mean((d_real - 1) ** 2)
-            # d_loss_fake = torch.mean(d_fake ** 2)
-            # errD_loss_batch = 0.5 * (d_loss_real + d_loss_fake)
-            # errG_loss_batch = torch.mean((d_fake - 1) ** 2)
+            # Discriminator
+            d_fake = discriminator(fine_batch, divide_ratio=2)
+            d_real = discriminator(ground_truth_batch, divide_ratio=2)
+            d_loss_real = torch.mean((d_real - 1) ** 2)
+            d_loss_fake = torch.mean(d_fake ** 2)
+            errD_loss_batch = 0.5 * (d_loss_real + d_loss_fake)
 
-            # total_gen_loss_batch = errG_loss_batch + total_loss_rec_batch * args.rec_weight
-            # total_dis_loss_batch = errD_loss_batch
+            total_dis_loss_batch = errD_loss_batch
+            optimiser_d.zero_grad()
+            total_dis_loss_batch.backward(retain_graph=True)
 
+            errG_loss_batch = torch.mean((d_fake - 1) ** 2)
+            total_gen_loss_batch = errG_loss_batch + total_loss_rec_batch * args.rec_weight
             optimiser_g.zero_grad()
-            # total_gen_loss_batch.backward()
-            total_loss_rec_batch.backward()
+            total_gen_loss_batch.backward()
+
+            optimiser_d.step()
             optimiser_g.step()
 
-            # optimiser_d.zero_grad()
-            # total_dis_loss_batch.backward()
-            # optimiser_d.step()
+
 
 
 if __name__ == '__main__':
