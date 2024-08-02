@@ -6,7 +6,6 @@ import sys
 import os
 from torch.utils.data import DataLoader
 from scripts.DatasetLoader import DatasetLoader
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from scripts.model import Encoder, Decoder, Generator, Discriminator
 from pytorch3d.loss import chamfer_distance
 import torch.autograd as autograd
@@ -67,8 +66,6 @@ def train(args):
 
             optimiser_d.step()
             optimiser_g.step()
-
-
 
 
 if __name__ == '__main__':

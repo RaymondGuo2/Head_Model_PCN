@@ -62,16 +62,6 @@ def gen_grid(num_grid_point):
     return grid
 
 
-# Adaptation from Cascaded Point Completion
-# def conv2d(inputs, num_output_channels, kernel_size, stride=(1,1), activation_fn=None):
-#     layers = []
-#     conv = nn.Conv2d(in_channels=inputs.shape[1], out_channels=num_output_channels, kernel_size=kernel_size, stride=stride, padding=0, bias=True)
-#     layers.append(conv)
-#     if activation_fn:
-#         layers.append(activation_fn)
-#
-#     return nn.Sequential(*layers)
-
 def conv2d(in_channels, num_output_channels, kernel_size, stride=(1,1), activation_fn=None):
     layers = []
     conv = nn.Conv2d(in_channels=in_channels, out_channels=num_output_channels, kernel_size=kernel_size, stride=stride, padding=0, bias=True)
@@ -84,10 +74,7 @@ def conv2d(in_channels, num_output_channels, kernel_size, stride=(1,1), activati
 
 def contract_expand_operation(inputs, up_ratio):
     batch_size, channels, num_points = inputs.shape  # (B, 64, 2048)
-    # net = inputs.view(batch_size, up_ratio, num_points // up_ratio , channels)  # (B, 2, 1024, 64)
     net = inputs.view(batch_size, channels, up_ratio, num_points // up_ratio)
-    # net = net.permute(0, 2, 1, 3)  # (B, 1024, 2, 64)
-    # net = net.permute(0, 1, 3, 2)
 
     conv1 = conv2d(channels, 64, (1, 1), activation_fn=nn.ReLU())
     net = conv1(net)
