@@ -106,6 +106,8 @@ def train(args):
 
         print(f"Epoch [{epoch + 1}/{args.epochs}], Train Loss: {train_loss_epoch:.4f}, Validation Loss: {val_loss_epoch:.4f}")
 
+    torch.save(generator.state_dict(), os.path.join(args.checkpoint, 'generator.pth'))
+
     plt.figure(figsize=(10, 5))
     plt.plot(range(1, args.epochs + 1), train_losses, label='Training Loss')
     plt.plot(range(1, args.epochs + 1), val_losses, label='Validation Loss')
@@ -120,7 +122,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_data', default='/Users/raymondguo/Desktop/IndividualProject/faceCompletionData')
     parser.add_argument('--val_data', default='/Users/raymondguo/Desktop/IndividualProject/faceCompletionData')
-    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--checkpoint', default='/Users/raymondguo/Desktop/IndividualProject/object_autocompletion/checkpoint')
+    parser.add_argument('--epochs', type=int, default=2)
     parser.add_argument('--batch_size', default=2, type=int)
     parser.add_argument('--generator_learning_rate', default=1e-4, type=float)
     parser.add_argument('--discriminator_learning_rate', default=1e-4, type=float)
