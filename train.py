@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 def train(args):
     # Load datasets
-    autograd.set_detect_anomaly(True)
+    # autograd.set_detect_anomaly(True)
     train_data = DatasetLoader(args.train_data, 'train')
     val_data = DatasetLoader(args.val_data, 'val')
     data_train = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
@@ -76,8 +76,8 @@ def train(args):
             optimiser_d.step()
             optimiser_g.step()
 
-            train_loss_epoch += total_loss_rec_batch.item()
-            # train_loss_epoch += total_loss_fine.item()
+            # train_loss_epoch += total_loss_rec_batch.item()
+            train_loss_epoch += total_loss_fine.item()
 
         train_loss_epoch /= len(data_train)
         train_losses.append(train_loss_epoch)
@@ -90,23 +90,18 @@ def train(args):
                 ground_truth_batch = ground_truth_batch.to(args.device)
                 coarse_batch, fine_batch = generator(partial_input_batch, args.step_ratio)
 
-                chamfer_coarse, _ = chamfer_distance(coarse_batch, ground_truth_batch, batch_reduction=None, point_reduction=None)
-                dist1_coarse, dist2_coarse = chamfer_coarse
                 chamfer_fine, _ = chamfer_distance(fine_batch, ground_truth_batch, batch_reduction=None, point_reduction=None)
                 dist1_fine, dist2_fine = chamfer_fine
 
-                total_loss_coarse = (torch.mean(torch.sqrt(dist1_coarse)) + torch.mean(torch.sqrt(dist2_coarse))) / 2
                 total_loss_fine = (torch.mean(torch.sqrt(dist1_fine)) + torch.mean(torch.sqrt(dist2_fine))) / 2
-                alpha = 0.5
-                total_loss_rec_batch = alpha * total_loss_fine + (1 - alpha) * total_loss_coarse
-                val_loss_epoch += total_loss_rec_batch.item()
+                val_loss_epoch += total_loss_fine.item()
 
-        val_loss_epoch /= len(val_data)
+        val_loss_epoch /= len(data_val)
         val_losses.append(val_loss_epoch)
 
         print(f"Epoch [{epoch + 1}/{args.epochs}], Train Loss: {train_loss_epoch:.4f}, Validation Loss: {val_loss_epoch:.4f}")
 
-    torch.save(generator.state_dict(), os.path.join(args.checkpoint, 'generator.pth'))
+    torch.save(generator.state_dict(), os.path.join(args.checkpoint, 'generator_new.pth'))
 
     plt.figure(figsize=(10, 5))
     plt.plot(range(1, args.epochs + 1), train_losses, label='Training Loss')

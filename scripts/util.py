@@ -50,7 +50,7 @@ def gen_grid_up(up_ratio):
     grid_x = torch.as_tensor(torch.linspace(-0.2, 0.2, num_x))  # linearly spaced num_x points between -0.2 and 0.2
     grid_y = torch.as_tensor(torch.linspace(-0.2, 0.2, num_y))  # linearly spaced num_y points between -0.2 and 0.2
 
-    x, y = torch.meshgrid(grid_x, grid_y)  # 2D coordinate matrices
+    x, y = torch.meshgrid(grid_x, grid_y, indexing='ij')  # 2D coordinate matrices
     grid = torch.stack([x, y], dim=-1).reshape(-1, 2)  # (num_x * num_y, 2) so [2, 2, 2] -> [4, 2]
     return grid
 
