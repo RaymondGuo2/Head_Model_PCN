@@ -142,3 +142,4 @@ class Discriminator(nn.Module):
         return patch_values  # (B, 256, 1)
 
 ## GAN Loss plot and print when saving the model
+# gan failure modes
