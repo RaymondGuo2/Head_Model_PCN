@@ -5,12 +5,11 @@ import trimesh
 
 
 # Various parts taken from Open3D documentation: https://www.open3d.org/docs/0.9.0/tutorial/Basic/working_with_numpy.html#from-numpy-to-open3d-pointcloud
-def numpy_to_cloud(file_path):
-    numpy_array = np.load(file_path)
+def numpy_to_cloud(numpy_array):
     pcd = open3d.geometry.PointCloud()
     pcd.points = open3d.utility.Vector3dVector(numpy_array)
 
-    path = os.path.splitext(file_path)[0] + 'post.pcd'
+    path = 'trial.pcd'
     open3d.io.write_point_cloud(path, pcd)
 
     pcd_load = open3d.io.read_point_cloud(path)
@@ -34,12 +33,12 @@ def cloud_to_mesh(file_path):
                                vertex_normals=np.asarray(mesh.vertex_normals))
     trimesh.convex.is_convex(tri_mesh)
 
-    open3d.io.write_triangle_mesh('../data/processed.obj', mesh)
+    open3d.io.write_triangle_mesh('trial.obj', mesh)
     open3d.visualization.draw_geometries([mesh])
 
 
 if __name__ == '__main__':
     # file_path = './data/000031_processed.npy'
     # numpy_to_cloud(file_path)
-    cloud_to_mesh('../data/000007_processedpost.ply')
+    cloud_to_mesh('./trial.pcd')
 

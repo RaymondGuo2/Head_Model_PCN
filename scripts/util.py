@@ -22,10 +22,10 @@ def symmetric_sample(points, num):
     # Permute since tensor size previously was (B x 2048 x 3) but need (B x 3 x 2048)
     # Be wary that maybe you don't want to permute the tensor yet in case the function takes the input differently
     # points = points.permute(0, 2, 1)
-
+    device = points.device
     batch_size, num_points, channels = points.shape  # (B x 2048 x 3)
     points_fps = points.view(-1, channels)  # (B x 2048) x 3
-    batch = torch.arange(batch_size).repeat_interleave(num_points)  # Reshape to 1D tensor for all batches and num_points so (B x num_points)
+    batch = torch.arange(batch_size, device=device).repeat_interleave(num_points)  # Reshape to 1D tensor for all batches and num_points so (B x num_points)
     p1_idx = fps(points_fps, batch, ratio=num/num_points)  # Output is (B x num)
     p1_idx = p1_idx.view(batch_size, -1) % num_points
     input_fps = masked_gather(points, p1_idx)  # Output is (B x num x 3)
@@ -73,17 +73,18 @@ def conv2d(in_channels, num_output_channels, kernel_size, stride=(1,1), activati
 
 
 def contract_expand_operation(inputs, up_ratio):
+    device = inputs.device
     batch_size, channels, num_points = inputs.shape  # (B, 64, 2048)
     net = inputs.view(batch_size, channels, up_ratio, num_points // up_ratio)
 
-    conv1 = conv2d(channels, 64, (1, 1), activation_fn=nn.ReLU())
+    conv1 = conv2d(channels, 64, (1, 1), activation_fn=nn.ReLU()).to(device)
     net = conv1(net)
 
-    conv2 = conv2d(64, 128, (1, 1), activation_fn=nn.ReLU())
+    conv2 = conv2d(64, 128, (1, 1), activation_fn=nn.ReLU()).to(device)
     net = conv2(net)
 
     # net = net.view(batch_size, -1, up_ratio, 64)
-    conv3 = conv2d(128, 64, (1, 1), activation_fn=nn.ReLU())
+    conv3 = conv2d(128, 64, (1, 1), activation_fn=nn.ReLU()).to(device)
     net = conv3(net)
     net = net.view(batch_size, 64, 2048)
     return net
@@ -133,41 +134,42 @@ def contract_expand_operation(inputs, up_ratio):
 
 
 def pointnet_sa_module_msg(xyz, points, npoint, radius_list, nsample_list, mlp_list, use_xyz=True, use_nchw=True):
+    device = xyz.device
     batch_size, num_points, channels = xyz.shape  # (B x 2048 x 3)
-    xyz_fps = xyz.reshape(-1, channels)  # (B x 2048) x 3
-    batch = torch.arange(batch_size).repeat_interleave(num_points)  # Reshape to 1D tensor for all batches and num_points so (B x num_points)
+    xyz_fps = xyz.reshape(-1, channels).to(device)  # (B x 2048) x 3
+    batch = torch.arange(batch_size, device=device).repeat_interleave(num_points)  # Reshape to 1D tensor for all batches and num_points so (B x num_points)
     p1_idx = fps(xyz_fps, batch, ratio=npoint/num_points)  # Output is (B x num)
     p1_idx = p1_idx.view(batch_size, -1) % num_points
-    new_xyz = masked_gather(xyz, p1_idx)
+    new_xyz = masked_gather(xyz, p1_idx).to(device)
     new_points_list = []
 
     for i in range(len(radius_list)):
         radius = radius_list[i]
         nsample = nsample_list[i]
         idx, pts_cnt = query_ball_point(radius, nsample, xyz, new_xyz)
-        grouped_xyz = group_point(xyz, idx)
+        grouped_xyz = group_point(xyz, idx).to(device)
         # grouped_xyz -= torch.tile(new_xyz.unsqueeze(2), (1, 1, nsample, 1))
         grouped_xyz = grouped_xyz - torch.tile(new_xyz.unsqueeze(2), (1, 1, nsample, 1))
         if points is not None:
             grouped_points = group_point(points, idx)
             if use_xyz:
-                grouped_points = torch.cat([grouped_points, grouped_xyz], dim=-1)
+                grouped_points = torch.cat([grouped_points, grouped_xyz], dim=-1).to(device)
         else:
             grouped_points = grouped_xyz
         if use_nchw:
-            grouped_points = grouped_points.permute(0, 3, 1, 2)
-        grouped_points = grouped_points.permute(0, 3, 1, 2)
+            grouped_points = grouped_points.permute(0, 3, 1, 2).to(device)
+        grouped_points = grouped_points.permute(0, 3, 1, 2).to(device)
         for j, num_out_channel in enumerate(mlp_list[i]):
             in_channels = grouped_points.size(1)
-            conv_layer = conv2d(in_channels, num_out_channel, kernel_size=(1, 1), stride=(1, 1), activation_fn=nn.LeakyReLU())
+            conv_layer = conv2d(in_channels, num_out_channel, kernel_size=(1, 1), stride=(1, 1), activation_fn=nn.LeakyReLU()).to(device)
             grouped_points = conv_layer(grouped_points)
         if use_nchw:
-            grouped_points = grouped_points.permute(0, 2, 3, 1)
+            grouped_points = grouped_points.permute(0, 2, 3, 1).to(device)
         new_points, _ = torch.max(grouped_points, dim=-1)
-        new_points = new_points.permute(0, 2, 1)
+        new_points = new_points.permute(0, 2, 1).to(device)
         new_points_list.append(new_points)
 
-    new_points_concat = torch.cat(new_points_list, dim=-1)
+    new_points_concat = torch.cat(new_points_list, dim=-1).to(device)
     return new_xyz, new_points_concat
 
 

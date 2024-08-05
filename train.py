@@ -21,11 +21,12 @@ def train(args):
     data_val = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
 
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
+
     # Set up the Generator
-    encoder = Encoder().to(args.device)
-    decoder = Decoder().to(args.device)
-    generator = Generator(encoder, decoder).to(args.device)
-    discriminator = Discriminator().to(args.device)
+    encoder = Encoder().to(device)
+    decoder = Decoder().to(device)
+    generator = Generator(encoder, decoder).to(device)
+    discriminator = Discriminator().to(device)
 
     # Optimisers
     optimiser_g = torch.optim.Adam(list(generator.parameters()), lr=args.generator_learning_rate)
@@ -42,8 +43,9 @@ def train(args):
 
         train_loss_epoch = 0
         for batch_idx, (partial_input_batch, ground_truth_batch) in enumerate(data_train):
-            partial_input_batch = partial_input_batch.to(args.device)
-            ground_truth_batch = ground_truth_batch.to(args.device)
+            print(f"Training batch {batch_idx + 1} / {len(data_train)}")
+            partial_input_batch = partial_input_batch.to(device)
+            ground_truth_batch = ground_truth_batch.to(device)
             # Chamfer Distance from Pytorch3D
             coarse_batch, fine_batch = generator(partial_input_batch, args.step_ratio)
             chamfer_coarse, _ = chamfer_distance(coarse_batch, ground_truth_batch, batch_reduction=None, point_reduction=None)
@@ -86,8 +88,8 @@ def train(args):
         val_loss_epoch = 0
         with torch.no_grad():
             for batch_idx, (partial_input_batch, ground_truth_batch) in enumerate(data_val):
-                partial_input_batch = partial_input_batch.to(args.device)
-                ground_truth_batch = ground_truth_batch.to(args.device)
+                partial_input_batch = partial_input_batch.to(device)
+                ground_truth_batch = ground_truth_batch.to(device)
                 coarse_batch, fine_batch = generator(partial_input_batch, args.step_ratio)
 
                 chamfer_fine, _ = chamfer_distance(fine_batch, ground_truth_batch, batch_reduction=None, point_reduction=None)
@@ -101,7 +103,7 @@ def train(args):
 
         print(f"Epoch [{epoch + 1}/{args.epochs}], Train Loss: {train_loss_epoch:.4f}, Validation Loss: {val_loss_epoch:.4f}")
 
-    torch.save(generator.state_dict(), os.path.join(args.checkpoint, 'generator_new.pth'))
+    torch.save(generator.state_dict(), os.path.join(args.checkpoint, 'train_0508_0915.pth'))
 
     plt.figure(figsize=(10, 5))
     plt.plot(range(1, args.epochs + 1), train_losses, label='Training Loss')

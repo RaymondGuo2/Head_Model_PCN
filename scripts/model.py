@@ -6,6 +6,7 @@ from .util import symmetric_sample, gen_grid_up, contract_expand_operation, poin
 import math
 from torch_geometric.nn import fps
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class Encoder(nn.Module):
     def __init__(self, embed_size=1024):
@@ -22,7 +23,7 @@ class Encoder(nn.Module):
     def forward(self, out):
         # Initial tensor shape: (B, 2048, 3)
         # Permute since nn.Conv1d expects B x num_channels x num_points
-        out = out.permute(0, 2, 1)  # (B, 3, 2048)
+        out = out.permute(0, 2, 1).to(device)  # (B, 3, 2048)
         features = self.layer1(out)  # (B, 256, 2048)
         features_global, _ = torch.max(features, dim=2, keepdim=True)  # (B, 256, 1)
         features_global_tiled = features_global.repeat(1, 1, out.size(2))  # (B, 256, 2048)
@@ -59,25 +60,27 @@ class Decoder(nn.Module):
 
     def forward(self, latent_code, partial_inputs, step_ratio, num_extract=512, mean_feature=None):
         # latent_code taken from the encoder is in the size of embed_size (since default is 1024), then self.level0 takes 1024 as its first dimension
+        latent_code = latent_code.to(device)
+        partial_inputs = partial_inputs.to(device)
         level0 = self.level0(latent_code)  # (B x 1024) -> (B x 1536)
         level0 = level0.view(-1, 512, 3)  # (B x 1536) -> (B x 512 x 3)
         # Coarse reconstruction completed
         coarse = level0  # (B x 512 x 3)
         # partial_inputs is still (B x 2048 x 3)
-        input_fps = symmetric_sample(partial_inputs, int(num_extract / 2))  # (B x num_extract x 3)
+        input_fps = symmetric_sample(partial_inputs, int(num_extract / 2)).to(device)  # (B x num_extract x 3)
         level0 = torch.cat([input_fps, level0], dim=1)  # (B x (num_extract + 512) x 3) or in this case (B x 1024 x 3)
 
         # Point subsampling
         if num_extract > 512:
             b, n, c = level0.shape
             level0_fps = level0.view(b * n, c)
-            b_reshape = torch.arange(b).view(-1, 1).repeat(1, n).view(-1)
+            b_reshape = torch.arange(b).view(-1, 1).repeat(1, n).view(-1).to(device)
             fps_num = fps(level0_fps, b_reshape, ratio=1024 / n)
             level0 = masked_gather(level0, fps_num)
 
         for i in range(int(math.log2(step_ratio))):
             num_fine = 2 ** (i + 1) * 1024
-            grid = gen_grid_up(2 ** (i + 1))
+            grid = gen_grid_up(2 ** (i + 1)).to(device)
             grid = grid.unsqueeze(0)  # (1, num_points, 2)
             grid_feat = torch.tile(grid, (
             level0.shape[0], 1024, 1))  # (1, num_points, 2) -> (batch_size, num_points * 1024, 2)
@@ -88,7 +91,7 @@ class Decoder(nn.Module):
                                      (1, num_fine, 1))  # (B, 1, embed_size) -> (B, num_fine, embed_size)
 
             if mean_feature is not None:
-                mean_feature_use = self.mean_feature_layer()
+                mean_feature_use = self.mean_feature_layer().to(device)
                 mean_feature_use = mean_feature_use.unsqueeze(1)
                 mean_feature_use = torch.tile(mean_feature_use, (1, num_fine, 1))
                 feat = torch.cat((grid_feat, point_feat, global_feat, mean_feature_use), dim=2)
@@ -100,7 +103,7 @@ class Decoder(nn.Module):
 
             feat = feat.permute(0, 2, 1)  # May need to permute given Conv1D requirements -> (B, 1029, 2048)
             feat1 = self.feat1_layer(feat)  # (B, 64, 2048)
-            feat2 = contract_expand_operation(feat1, 2)  # (B, 64, 2048)
+            feat2 = contract_expand_operation(feat1, 2).to(device)  # (B, 64, 2048)
             feat = feat1 + feat2
             fine_feat = self.fine_layer(feat)  # (B, 3, 2048)
             fine = fine_feat.permute(0, 2, 1) + point_feat  # (B, 2048, 3) + (B, 2048, 3)
@@ -116,6 +119,7 @@ class Generator(nn.Module):
         self.decoder = decoder
 
     def forward(self, input_pl, step_ratio, num_extract=512, mean_feature=None):
+        input_pl = input_pl.to(device)
         features_partial = self.encoder(input_pl)
         coarse, fine = self.decoder(features_partial, input_pl, step_ratio, num_extract, mean_feature)
         return coarse, fine
