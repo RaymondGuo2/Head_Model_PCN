@@ -41,5 +41,5 @@ def cloud_to_mesh(file_path):
 if __name__ == '__main__':
     # file_path = './data/000031_processed.npy'
     # numpy_to_cloud(file_path)
-    cloud_to_mesh('../data/000007_processedpost.ply')
+    numpy_to_cloud('./../../pcd_test/trial.npy')
 
