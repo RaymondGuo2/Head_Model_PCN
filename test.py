@@ -29,6 +29,7 @@ def test(args):
 
             total_loss_fine = (torch.mean(torch.sqrt(dist1_fine)) + torch.mean(torch.sqrt(dist2_fine))) / 2
             test_loss += total_loss_fine.item()
+            print(f"Test_loss: {test_loss}")
 
     test_loss /= len(data_test)
 
@@ -38,9 +39,8 @@ def test(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--test_data', default='/Users/raymondguo/Desktop/IndividualProject/faceCompletionData')
-    parser.add_argument('--checkpoint', default='/Users/raymondguo/Desktop/IndividualProject/object_autocompletion/checkpoint/generator_new.pth')
-    parser.add_argument('--epochs', type=int, default=2)
-    parser.add_argument('--batch_size', default=2, type=int)
+    parser.add_argument('--checkpoint', default='/Users/raymondguo/Desktop/IndividualProject/object_autocompletion/checkpoint/train_0408_1056.pth')
+    parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--device', default='cpu', type=str)
     parser.add_argument('--step_ratio', type=int, default=2)
     args = parser.parse_args()
