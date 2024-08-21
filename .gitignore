@@ -12,6 +12,8 @@ __pycache__/
 .idea
 *cache*
 
+__init__.py
+
 # C extensions
 *.so
 
