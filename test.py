@@ -4,6 +4,8 @@ from torch.utils.data import DataLoader
 from scripts.DatasetLoader import DatasetLoader
 from scripts.model import Encoder, Decoder, Generator
 from pytorch3d.loss import chamfer_distance
+import matplotlib.pyplot as plt
+import os
 
 
 def test(args):
@@ -18,6 +20,8 @@ def test(args):
 
     generator.eval()
     test_loss = 0
+    losses = []
+
     with torch.no_grad():
         for batch_idx, (partial_input_batch, ground_truth_batch) in enumerate(data_test):
             partial_input_batch = partial_input_batch.to(args.device)
@@ -29,11 +33,21 @@ def test(args):
 
             total_loss_fine = (torch.mean(torch.sqrt(dist1_fine)) + torch.mean(torch.sqrt(dist2_fine))) / 2
             test_loss += total_loss_fine.item()
+            losses.append(total_loss_fine.item())
             print(f"Test_loss: {test_loss}")
 
-    test_loss /= len(data_test)
+        test_loss /= len(data_test)
+        print(f"Test Loss: {test_loss:.4f}")
 
-    print(f"Test Loss: {test_loss:.4f}")
+    plt.figure(figsize=(10, 5))
+    plt.plot(losses, label="Batch Loss")
+    plt.xlabel("Batch")
+    plt.ylabel("Loss")
+    plt.title("Test Loss per Batch")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(os.path.join('./plots', 'test_loss.png'))
+
 
 
 if __name__ == '__main__':
