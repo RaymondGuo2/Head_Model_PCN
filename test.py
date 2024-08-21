@@ -10,11 +10,11 @@ def test(args):
     test_data = DatasetLoader(args.test_data, 'test')
     data_test = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
 
-    device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     encoder = Encoder().to(args.device)
     decoder = Decoder().to(args.device)
     generator = Generator(encoder, decoder).to(args.device)
-    generator.load_state_dict(torch.load(args.checkpoint))
+    generator.load_state_dict(torch.load(args.checkpoint, map_location='cpu'))
 
     generator.eval()
     test_loss = 0

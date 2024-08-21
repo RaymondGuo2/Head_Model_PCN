@@ -21,6 +21,7 @@ def train(args):
     data_val = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
 
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
+    print(device)
 
     # Set up the Generator
     encoder = Encoder().to(device)
@@ -34,6 +35,9 @@ def train(args):
 
     train_losses = []
     val_losses = []
+    generator_losses = []
+    discriminator_losses = []
+
 
     for epoch in range(args.epochs):
         print(f"Training epoch {epoch + 1} / {args.epochs}")
@@ -42,6 +46,9 @@ def train(args):
         discriminator.train()
 
         train_loss_epoch = 0
+        generator_loss_epoch = 0
+        discriminator_loss_epoch = 0
+
         for batch_idx, (partial_input_batch, ground_truth_batch) in enumerate(data_train):
             print(f"Training batch {batch_idx + 1} / {len(data_train)}")
             partial_input_batch = partial_input_batch.to(device)
@@ -78,11 +85,17 @@ def train(args):
             optimiser_d.step()
             optimiser_g.step()
 
-            # train_loss_epoch += total_loss_rec_batch.item()
             train_loss_epoch += total_loss_fine.item()
+            generator_loss_epoch += total_gen_loss_batch.item()
+            discriminator_loss_epoch += total_dis_loss_batch.item()
 
         train_loss_epoch /= len(data_train)
+        generator_loss_epoch /= len(data_train)
+        discriminator_loss_epoch /= len(data_train)
+
         train_losses.append(train_loss_epoch)
+        generator_losses.append(generator_loss_epoch)
+        discriminator_losses.append(discriminator_loss_epoch)
 
         generator.eval()
         val_loss_epoch = 0
@@ -101,10 +114,13 @@ def train(args):
         val_loss_epoch /= len(data_val)
         val_losses.append(val_loss_epoch)
 
-        print(f"Epoch [{epoch + 1}/{args.epochs}], Train Loss: {train_loss_epoch:.4f}, Validation Loss: {val_loss_epoch:.4f}")
+        print(f"Epoch [{epoch + 1}/{args.epochs}], Train Loss: {train_loss_epoch:.4f}, "
+              f"Validation Loss: {val_loss_epoch:.4f}, Generator Loss: {generator_loss_epoch:.4f}, "
+              f"Discriminator Loss: {discriminator_loss_epoch:.4f}")
 
-    torch.save(generator.state_dict(), os.path.join(args.checkpoint, 'train_0508_0915.pth'))
+    torch.save(generator.state_dict(), os.path.join(args.checkpoint, 'train_1108_long.pth'))
 
+    # Plot and save the Training vs Validation Loss
     plt.figure(figsize=(10, 5))
     plt.plot(range(1, args.epochs + 1), train_losses, label='Training Loss')
     plt.plot(range(1, args.epochs + 1), val_losses, label='Validation Loss')
@@ -112,22 +128,35 @@ def train(args):
     plt.ylabel('Loss')
     plt.legend()
     plt.title('Training and Validation Loss')
-    plt.show()
+    plt.grid(True)
+    plt.savefig(os.path.join(args.checkpoint, 'train_vs_val_loss.png'))
+
+    # Plot and save the Generator vs Discriminator Loss
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(1, args.epochs + 1), generator_losses, label='Generator Loss')
+    plt.plot(range(1, args.epochs + 1), discriminator_losses, label='Discriminator Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.title('Generator and Discriminator Loss')
+    plt.grid(True)
+    plt.savefig(os.path.join(args.checkpoint, 'gen_vs_dis_loss.png'))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--train_data', default='/Users/raymondguo/Desktop/IndividualProject/faceCompletionData')
-    parser.add_argument('--val_data', default='/Users/raymondguo/Desktop/IndividualProject/faceCompletionData')
-    parser.add_argument('--checkpoint', default='/Users/raymondguo/Desktop/IndividualProject/object_autocompletion/checkpoint')
+    parser.add_argument('--train_data', default='/vol/bitbucket/rqg23/project_data')
+    parser.add_argument('--val_data', default='/vol/bitbucket/rqg23/project_data')
+    parser.add_argument('--checkpoint', default='./checkpoint')
     parser.add_argument('--epochs', type=int, default=2)
-    parser.add_argument('--batch_size', default=2, type=int)
+    parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--generator_learning_rate', default=1e-4, type=float)
     parser.add_argument('--discriminator_learning_rate', default=1e-4, type=float)
     parser.add_argument('--input_num_points', default=2048, type=int)
     parser.add_argument('--gt_num_points', default=2048, type=int)
-    parser.add_argument('--device', default='cpu', type=str)
+    parser.add_argument('--device', default='cuda:0', type=str)
     parser.add_argument('--rec_weight', default=200.0, type=float)
     parser.add_argument('--step_ratio', type=int, default=2)
+    parser.add_argument('--plot_path', type=str, default='./plots')
     args = parser.parse_args()
     train(args)
