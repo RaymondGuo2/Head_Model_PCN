@@ -173,7 +173,7 @@ def pointnet_sa_module_msg(xyz, points, npoint, radius_list, nsample_list, mlp_l
     return new_xyz, new_points_concat
 
 
-# GPT Function (Investigate pytorch3d function) - will attempt to optimise with C++
+# Function written with assistance from ChatGPT according to the code in the original repository (https://github.com/xiaogangw/cascaded-point-completion)
 def query_ball_point(radius, nsample, xyz, new_xyz):
     """
     Args:
@@ -220,7 +220,7 @@ def query_ball_point(radius, nsample, xyz, new_xyz):
 
     return idx, pts_cnt
 
-# GPT Function
+# Function written with assistance from ChatGPT according to the code in the original repository (https://github.com/xiaogangw/cascaded-point-completion)
 def group_point(points, idx):
     """
     Args:

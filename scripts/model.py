@@ -145,5 +145,4 @@ class Discriminator(nn.Module):
         patch_values = patch_values.permute(0, 2, 1)
         return patch_values  # (B, 256, 1)
 
-## GAN Loss plot and print when saving the model
-# gan failure modes
+
