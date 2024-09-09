@@ -1,4 +1,5 @@
-# Code taken from Cascaded Point Completion by Yuan et al. (2019)
+# Code adapted from the original repository code for the paper Cascaded Refinement Network for Point Cloud Completion by Wang et al. (2020)
+# Original repository can be found here: https://github.com/xiaogangw/cascaded-point-completion
 
 import torch
 import torch.nn as nn
